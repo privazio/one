@@ -284,6 +284,21 @@ public class VirtualMachine extends PoolElement{
     }
 
     /**
+     * Updates (appends) a set of supported configuration attributes in the VM
+     * template
+     *
+     * @param client XML-RPC Client.
+     * @param id The id of the target vm.
+     * @param new_template New template contents
+     * @return If an error occurs the error message contains the reason.
+     */
+    public static OneResponse updateconf(Client client, int id,
+        String new_template)
+    {
+        return client.call(UPDATECONF, id, new_template);
+    }
+
+    /**
      * Resizes the VM capacity
      *
      * @param client XML-RPC Client.
@@ -647,11 +662,11 @@ public class VirtualMachine extends PoolElement{
      * </ul>
      *
      * @param action The action name to be performed, can be:<br>
-     * 
+     *
      * "terminate-hard", "terminate", "undeploy-hard", "undeploy",
      * "poweroff-hard", "poweroff", "reboot-hard", "reboot", "hold",
      * "release", "stop", "suspend", "resume", "resched", "unresched"
-     * 
+     *
      * @return If an error occurs the error message contains the reason.
      */
     protected OneResponse action(String action)
@@ -916,6 +931,18 @@ public class VirtualMachine extends PoolElement{
     }
 
     /**
+     * Updates (appends) a set of supported configuration attributes in the VM
+     * template
+     *
+     * @param new_template New template contents
+     * @return If an error occurs the error message contains the reason.
+     */
+    public OneResponse updateconf(String new_template)
+    {
+        return updateconf(client, id, new_template);
+    }
+
+    /**
      * Resizes this VM's capacity
      *
      * @param capacityTemplate Template containing the new capacity
@@ -1011,7 +1038,7 @@ public class VirtualMachine extends PoolElement{
      * <li>3 delete</li>
      * <li>4 delete-recreate</li>
      * </ul>
-     * 
+     *
      * @return If an error occurs the error message contains the reason.
      */
     public OneResponse recover(int operation)
