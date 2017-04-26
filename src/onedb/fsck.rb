@@ -428,99 +428,10 @@ EOT
         # HOST/VMS/ID
         ########################################################################
 
-        # DATA: Create a new empty table where we will store the new calculated values
-        create_table(:host_pool, :host_pool_new)
+        check_host
+        fix_host
 
-        # DATA: FIX: Calculate the host's xml and write them to host_pool_new
-        @db.transaction do
-            @db[:host_pool].each do |row|
-                host_doc = Nokogiri::XML(row[:body],nil,NOKOGIRI_ENCODING){|c| c.default_xml.noblanks}
-
-                hid = row[:oid]
-
-                counters_host = counters[:host][hid]
-
-                rvms        = counters_host[:rvms].size
-                cpu_usage   = (counters_host[:cpu]*100).to_i
-                mem_usage   = counters_host[:memory]*1024
-
-                # rewrite running_vms
-                host_doc.root.xpath("HOST_SHARE/RUNNING_VMS").each {|e|
-                    if e.text != rvms.to_s
-                        log_error(
-                            "Host #{hid} RUNNING_VMS has #{e.text} \tis\t#{rvms}")
-                        e.content = rvms
-                    end
-                }
-
-
-                # re-do list of VM IDs
-                vms_elem = host_doc.root.at_xpath("VMS").remove
-
-                vms_new_elem = host_doc.create_element("VMS")
-                host_doc.root.add_child(vms_new_elem)
-
-                counters_host[:rvms].each do |id|
-                    id_elem = vms_elem.at_xpath("ID[.=#{id}]")
-
-                    if id_elem.nil?
-                        log_error(
-                            "VM #{id} is missing from Host #{hid} VM id list")
-                    else
-                        id_elem.remove
-                    end
-
-                    vms_new_elem.add_child(host_doc.create_element("ID")).content = id.to_s
-                end
-
-                vms_elem.xpath("ID").each do |id_elem|
-                    log_error(
-                        "VM #{id_elem.text} is in Host #{hid} VM id list, "<<
-                        "but it should not")
-                end
-
-                host_doc.root.xpath("HOST_SHARE/PCI_DEVICES/PCI").each do |pci|
-                    if !pci.at_xpath("VMID").nil?
-                        vmid = pci.at_xpath("VMID").text.to_i
-
-                        if vmid != -1 && !counters_host[:rvms].include?(vmid)
-                            log_error("VM #{vmid} has a PCI device assigned in host #{hid}, but it should not. Device: #{pci.at_xpath('DEVICE_NAME').text}")
-                            pci.at_xpath("VMID").content = "-1"
-                        end
-                    end
-                end
-
-                # rewrite cpu
-                host_doc.root.xpath("HOST_SHARE/CPU_USAGE").each {|e|
-                    if e.text != cpu_usage.to_s
-                        log_error(
-                            "Host #{hid} CPU_USAGE has #{e.text} "<<
-                            "\tis\t#{cpu_usage}")
-                        e.content = cpu_usage
-                    end
-                }
-
-                # rewrite memory
-                host_doc.root.xpath("HOST_SHARE/MEM_USAGE").each {|e|
-                    if e.text != mem_usage.to_s
-                        log_error("Host #{hid} MEM_USAGE has #{e.text} "<<
-                            "\tis\t#{mem_usage}")
-                        e.content = mem_usage
-                    end
-                }
-
-                row[:body] = host_doc.root.to_s
-
-                # commit
-                @db[:host_pool_new].insert(row)
-            end
-        end
-
-        # Rename table
-        @db.run("DROP TABLE host_pool")
-        @db.run("ALTER TABLE host_pool_new RENAME TO host_pool")
-
-        log_time()
+        log_time
 
         ########################################################################
         # DATA: Marketplace
