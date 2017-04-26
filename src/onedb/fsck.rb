@@ -44,6 +44,7 @@ require 'fsck/image'
 require 'fsck/marketplaceapp'
 require 'fsck/marketplace'
 require 'fsck/vm'
+require 'fsck/cluster_vnc_bitmap'
 
 module OneDBFsck
     VERSION = "5.2.0"
@@ -389,44 +390,12 @@ EOT
 
         log_time()
 
+        # VNC
+
         # DATA: VNC Bitmap
 
-        # DATA: FIX: Re-create cluster_vnc_bitmap table
-        @db.run("ALTER TABLE cluster_vnc_bitmap RENAME TO old_cluster_vnc_bitmap")
-        create_table(:cluster_vnc_bitmap)
-
-        vnc_pool_size = 65536
-
-        @db.transaction do
-          @db.fetch("SELECT * FROM cluster_pool") do |row|
-            cluster_id = row[:oid]
-
-            if cluster_vnc[cluster_id]
-              map = ""
-              vnc_pool_size.times.each do |i|
-                map << (cluster_vnc[cluster_id].include?(vnc_pool_size - 1 - i) ? "1" : "0")
-              end
-
-              map_encoded = Base64::strict_encode64(Zlib::Deflate.deflate(map))
-            else
-              map_encoded = "eJztwYEAAAAAgCCl/ekWqQoAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABqFo8C0Q=="
-            end
-
-            old_map_encoded = @db[:old_cluster_vnc_bitmap].first(:id => cluster_id)[:map] rescue nil
-
-            if old_map_encoded != map_encoded
-                log_error("Cluster #{cluster_id} has not the proper reserved VNC ports")
-            end
-
-            # DATA: add new vnc bitmap
-            @db[:cluster_vnc_bitmap].insert(
-              :id  => cluster_id,
-              :map => map_encoded
-            )
-          end
-        end
-
-        @db.run("DROP TABLE old_cluster_vnc_bitmap")
+        check_cluster_vnc_bitmap
+        fix_cluster_vnc_bitmap
 
         log_time()
 
