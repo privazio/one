@@ -48,6 +48,9 @@ require 'fsck/cluster_vnc_bitmap'
 require 'fsck/history'
 require 'fsck/vrouter'
 
+require 'fsck/user_quotas'
+require 'fsck/group_quotas'
+
 module OneDBFsck
     VERSION = "5.2.0"
     LOCAL_VERSION = "5.3.80"
@@ -497,47 +500,9 @@ EOT
         # USER QUOTAS
         ########################################################################
 
-        # This block is not needed for now
-=begin
-        @db.transaction do
-            @db.fetch("SELECT oid FROM user_pool") do |row|
-                found = false
+        check_fix_user_quotas
 
-                @db.fetch("SELECT user_oid FROM user_quotas WHERE user_oid=#{row[:oid]}") do |q_row|
-                    found = true
-                end
-
-                if !found
-                    log_error("User #{row[:oid]} does not have a quotas entry")
-
-                    @db.run "INSERT INTO user_quotas VALUES(#{row[:oid]},'<QUOTAS><ID>#{row[:oid]}</ID><DATASTORE_QUOTA></DATASTORE_QUOTA><NETWORK_QUOTA></NETWORK_QUOTA><VM_QUOTA></VM_QUOTA><IMAGE_QUOTA></IMAGE_QUOTA></QUOTAS>');"
-                end
-            end
-        end
-=end
-        @db.run "ALTER TABLE user_quotas RENAME TO old_user_quotas;"
-        create_table(:user_quotas)
-
-        @db.transaction do
-            # oneadmin does not have quotas
-            @db.fetch("SELECT * FROM old_user_quotas WHERE user_oid=0") do |row|
-                @db[:user_quotas].insert(row)
-            end
-
-            @db.fetch("SELECT * FROM old_user_quotas WHERE user_oid>0") do |row|
-                doc = Nokogiri::XML(row[:body],nil,NOKOGIRI_ENCODING){|c| c.default_xml.noblanks}
-
-                calculate_quotas(doc, "uid=#{row[:user_oid]}", "User")
-
-                @db[:user_quotas].insert(
-                    :user_oid   => row[:user_oid],
-                    :body       => doc.root.to_s)
-            end
-        end
-
-        @db.run "DROP TABLE old_user_quotas;"
-
-        log_time()
+        log_time
 
         ########################################################################
         # Groups
@@ -545,47 +510,9 @@ EOT
         # GROUP QUOTAS
         ########################################################################
 
-        # This block is not needed for now
-=begin
-        @db.transaction do
-            @db.fetch("SELECT oid FROM group_pool") do |row|
-                found = false
+        check_fix_group_quotas
 
-                @db.fetch("SELECT group_oid FROM group_quotas WHERE group_oid=#{row[:oid]}") do |q_row|
-                    found = true
-                end
-
-                if !found
-                    log_error("Group #{row[:oid]} does not have a quotas entry")
-
-                    @db.run "INSERT INTO group_quotas VALUES(#{row[:oid]},'<QUOTAS><ID>#{row[:oid]}</ID><DATASTORE_QUOTA></DATASTORE_QUOTA><NETWORK_QUOTA></NETWORK_QUOTA><VM_QUOTA></VM_QUOTA><IMAGE_QUOTA></IMAGE_QUOTA></QUOTAS>');"
-                end
-            end
-        end
-=end
-        @db.run "ALTER TABLE group_quotas RENAME TO old_group_quotas;"
-        create_table(:group_quotas)
-
-        @db.transaction do
-            # oneadmin does not have quotas
-            @db.fetch("SELECT * FROM old_group_quotas WHERE group_oid=0") do |row|
-                @db[:group_quotas].insert(row)
-            end
-
-            @db.fetch("SELECT * FROM old_group_quotas WHERE group_oid>0") do |row|
-                doc = Nokogiri::XML(row[:body],nil,NOKOGIRI_ENCODING){|c| c.default_xml.noblanks}
-
-                calculate_quotas(doc, "gid=#{row[:group_oid]}", "Group")
-
-                @db[:group_quotas].insert(
-                    :group_oid   => row[:group_oid],
-                    :body       => doc.root.to_s)
-            end
-        end
-
-        @db.run "DROP TABLE old_group_quotas;"
-
-        log_time()
+        log_time
 
         ########################################################################
         # VM Templates
