@@ -98,6 +98,7 @@ module OneDBFsck
 
         # Image quotas
         img_usage = {}
+        datastore_usage = {}
 
         @db.fetch("SELECT body FROM vm_pool WHERE #{where_filter} AND state<>6") do |vm_row|
             vmdoc = nokogiri_doc(vm_row[:body])
@@ -145,6 +146,14 @@ module OneDBFsck
 
                             if !e.at_xpath("DISK_SNAPSHOT_TOTAL_SIZE").nil?
                                 sys_used += e.at_xpath("DISK_SNAPSHOT_TOTAL_SIZE").text.to_i
+                            end
+                        elsif !target.nil? && taget == "SELF"
+                            datastore_id = e.at_xpath("DATASTORE_ID").text
+                            datastore_usage[datastore_id] ||= 0
+                            datastore_usage[datastore_id] += size
+
+                            if !e.at_xpath("DISK_SNAPSHOT_TOTAL_SIZE").nil?
+                                datastore_usage[datastore_id] += e.at_xpath("DISK_SNAPSHOT_TOTAL_SIZE").text.to_i
                             end
                         end
                     end
@@ -357,6 +366,9 @@ module OneDBFsck
 
             images_used = 0 if images_used.nil?
             size_used   = 0 if size_used.nil?
+
+            cloned_usage = datastore_usage[ds_id] || 0
+            size_used += cloned_usage
 
             ds_elem.xpath("IMAGES_USED").each { |e|
                 if e.text != images_used.to_s
