@@ -147,7 +147,7 @@ module OneDBFsck
                             if !e.at_xpath("DISK_SNAPSHOT_TOTAL_SIZE").nil?
                                 sys_used += e.at_xpath("DISK_SNAPSHOT_TOTAL_SIZE").text.to_i
                             end
-                        elsif !target.nil? && taget == "SELF"
+                        elsif !target.nil? && target == "SELF"
                             datastore_id = e.at_xpath("DATASTORE_ID").text
                             datastore_usage[datastore_id] ||= 0
                             datastore_usage[datastore_id] += size
